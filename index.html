@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOUNDFORGE — Spotify Quiz Arena</title>
+  <meta name="description" content="Challenge your music knowledge. Connect Spotify, quiz your playlists, compete with friends." />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <!-- Particle background -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- ========== SCREEN: LANDING ========== -->
+    <section id="screen-landing" class="screen active">
+      <div class="landing-container">
+        <div class="logo-section">
+          <div class="logo-gear">
+            <svg viewBox="0 0 100 100" class="gear-svg">
+              <path d="M50 10 L55 0 L60 10 L65 5 L65 15 L72 12 L68 22 L76 20 L70 28 L78 28 L72 35 L80 38 L72 42 L78 48 L70 48 L76 55 L68 52 L72 60 L65 55 L65 65 L60 58 L55 65 L50 58 L45 65 L40 58 L35 65 L35 55 L28 60 L32 52 L24 55 L30 48 L22 48 L28 42 L20 38 L28 35 L22 28 L30 28 L24 20 L32 22 L28 12 L35 15 L35 5 L40 10 L45 0 L50 10Z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="50" cy="35" r="15" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <h1 class="logo-text">SOUND<span class="accent">FORGE</span></h1>
+          <p class="tagline">SPOTIFY QUIZ ARENA</p>
+        </div>
+        <div class="landing-actions">
+          <button id="btn-connect-spotify" class="btn btn-primary btn-lg">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+            CONNECT SPOTIFY
+          </button>
+          <div style="display: flex; gap: 14px; align-items: center; justify-content: center; margin-top: 14px; flex-wrap: wrap;">
+            <button id="btn-demo-mode" class="btn btn-secondary btn-sm" style="font-size: 0.85rem; padding: 0.55rem 1.1rem; border-color: var(--accent-primary); color: #fff;">
+              ⚡ QUICK DEMO PLAY
+            </button>
+            <button id="btn-config-client-id" class="btn-link" style="background: none; border: none; color: var(--text-muted); font-size: 0.85rem; font-family: var(--font-primary); cursor: pointer; text-decoration: underline; letter-spacing: 0.5px;">
+              ⚙️ Spotify Setup
+            </button>
+          </div>
+          <div id="user-profile" class="user-profile hidden">
+            <img id="user-avatar" class="avatar" src="" alt="Profile" />
+            <span id="user-name" class="user-name"></span>
+            <div class="win-streak-badge">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span id="user-streak">0</span>
+            </div>
+          </div>
+        </div>
+        <div id="mode-selection" class="mode-selection hidden">
+          <h2 class="section-title">SELECT MODE</h2>
+          <div class="mode-cards">
+            <button id="btn-solo" class="mode-card">
+              <div class="mode-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg>
+              </div>
+              <h3>SOLO</h3>
+              <p>Test your own knowledge</p>
+            </button>
+            <button id="btn-multiplayer" class="mode-card">
+              <div class="mode-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M17 14a4 4 0 014 4v2"/></svg>
+              </div>
+              <h3>WITH FRIENDS</h3>
+              <p>Compete in real-time</p>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: SOLO SETUP ========== -->
+    <section id="screen-solo-setup" class="screen">
+      <div class="setup-container">
+        <button class="btn-back" id="btn-back-solo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="section-title">SOLO FORGE</h2>
+        <div class="setup-form">
+          <div class="form-group">
+            <label>SELECT PLAYLIST</label>
+            <div id="solo-playlist-list" class="playlist-grid">
+              <!-- Playlists loaded dynamically -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label>NUMBER OF ROUNDS</label>
+            <div class="rounds-selector">
+              <button class="round-btn" data-rounds="5">5</button>
+              <button class="round-btn active" data-rounds="10">10</button>
+              <button class="round-btn" data-rounds="15">15</button>
+              <button class="round-btn" data-rounds="20">20</button>
+            </div>
+          </div>
+          <button id="btn-start-solo" class="btn btn-primary btn-lg" disabled>
+            IGNITE THE FORGE
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: MULTIPLAYER LOBBY ========== -->
+    <section id="screen-multiplayer" class="screen">
+      <div class="setup-container">
+        <button class="btn-back" id="btn-back-multi">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="section-title">MULTIPLAYER FORGE</h2>
+        <div class="multi-options">
+          <button id="btn-create-room" class="mode-card">
+            <div class="mode-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <h3>CREATE ROOM</h3>
+            <p>Host a new game</p>
+          </button>
+          <button id="btn-join-room" class="mode-card">
+            <div class="mode-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+            </div>
+            <h3>JOIN ROOM</h3>
+            <p>Enter with a code</p>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: CREATE ROOM ========== -->
+    <section id="screen-create-room" class="screen">
+      <div class="setup-container">
+        <button class="btn-back" id="btn-back-create">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="section-title">CREATE ROOM</h2>
+        <div class="room-code-display">
+          <p class="room-code-label">ROOM CODE</p>
+          <div class="room-code" id="room-code">------</div>
+          <div class="room-actions">
+            <button id="btn-copy-code" class="btn btn-outline btn-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              COPY CODE
+            </button>
+            <button id="btn-copy-link" class="btn btn-outline btn-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+              COPY LINK
+            </button>
+          </div>
+        </div>
+        <div class="setup-form">
+          <div class="form-group">
+            <label>PLAYLIST SOURCE</label>
+            <div class="playlist-source-toggle">
+              <button class="source-btn active" data-source="select">SELECT PLAYLIST</button>
+              <button class="source-btn" data-source="blend">CREATE BLEND</button>
+            </div>
+          </div>
+          <div class="form-group" id="create-playlist-section">
+            <label>SELECT PLAYLIST</label>
+            <div id="create-playlist-list" class="playlist-grid">
+              <!-- Playlists loaded dynamically -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label>NUMBER OF ROUNDS</label>
+            <div class="rounds-selector" id="create-rounds-selector">
+              <button class="round-btn" data-rounds="5">5</button>
+              <button class="round-btn active" data-rounds="10">10</button>
+              <button class="round-btn" data-rounds="15">15</button>
+              <button class="round-btn" data-rounds="20">20</button>
+            </div>
+          </div>
+          <div class="lobby-players">
+            <h3>PLAYERS IN LOBBY</h3>
+            <div id="lobby-player-list" class="player-list">
+              <!-- Players loaded dynamically -->
+            </div>
+          </div>
+          <button id="btn-start-multi" class="btn btn-primary btn-lg" disabled>
+            START FORGING
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: JOIN ROOM ========== -->
+    <section id="screen-join-room" class="screen">
+      <div class="setup-container">
+        <button class="btn-back" id="btn-back-join">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="section-title">JOIN ROOM</h2>
+        <div class="join-form">
+          <div class="form-group">
+            <label>ENTER ROOM CODE</label>
+            <div class="code-input-group">
+              <input type="text" id="join-code-input" class="code-input" maxlength="6" placeholder="______" autocomplete="off" />
+            </div>
+          </div>
+          <button id="btn-join-submit" class="btn btn-primary btn-lg">
+            JOIN THE FORGE
+          </button>
+        </div>
+        <div id="join-waiting" class="join-waiting hidden">
+          <div class="loader-ring"></div>
+          <p>Waiting for host to start...</p>
+          <div id="join-lobby-players" class="player-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: QUIZ GAME ========== -->
+    <section id="screen-quiz" class="screen">
+      <div class="quiz-container">
+        <div class="quiz-header">
+          <div class="quiz-info">
+            <span class="round-indicator">ROUND <span id="current-round">1</span> / <span id="total-rounds">10</span></span>
+          </div>
+          <div class="quiz-scoreboard" id="quiz-scoreboard">
+            <!-- Dynamic scoreboard -->
+          </div>
+        </div>
+        <div class="quiz-main">
+          <div class="audio-visualizer" id="audio-visualizer">
+            <div class="vinyl-record" id="vinyl-record">
+              <div class="vinyl-groove"></div>
+              <div class="vinyl-groove"></div>
+              <div class="vinyl-groove"></div>
+              <div class="vinyl-label">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+              </div>
+            </div>
+            <div class="timer-ring" id="timer-ring">
+              <svg viewBox="0 0 200 200">
+                <circle class="timer-bg" cx="100" cy="100" r="90" />
+                <circle class="timer-progress" id="timer-progress" cx="100" cy="100" r="90" />
+              </svg>
+              <span class="timer-text" id="timer-text">10</span>
+            </div>
+          </div>
+          <div class="quiz-options" id="quiz-options">
+            <button class="option-btn" data-index="0">
+              <span class="option-letter">A</span>
+              <span class="option-text"></span>
+            </button>
+            <button class="option-btn" data-index="1">
+              <span class="option-letter">B</span>
+              <span class="option-text"></span>
+            </button>
+            <button class="option-btn" data-index="2">
+              <span class="option-letter">C</span>
+              <span class="option-text"></span>
+            </button>
+            <button class="option-btn" data-index="3">
+              <span class="option-letter">D</span>
+              <span class="option-text"></span>
+            </button>
+          </div>
+        </div>
+        <div id="round-result" class="round-result hidden">
+          <div class="result-content">
+            <div id="result-icon" class="result-icon"></div>
+            <h3 id="result-text"></h3>
+            <p id="result-score"></p>
+            <p id="result-song" class="result-song"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SCREEN: RESULTS / PODIUM ========== -->
+    <section id="screen-results" class="screen">
+      <div class="results-container">
+        <h2 class="section-title results-title">FORGE COMPLETE</h2>
+        <div class="podium-section">
+          <div class="podium">
+            <div class="podium-place second" id="podium-2nd">
+              <div class="podium-avatar-wrap">
+                <img class="podium-avatar" src="" alt="" />
+              </div>
+              <span class="podium-name"></span>
+              <span class="podium-score"></span>
+              <div class="podium-block">
+                <span class="podium-rank">2</span>
+              </div>
+            </div>
+            <div class="podium-place first" id="podium-1st">
+              <div class="crown-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z"/></svg>
+              </div>
+              <div class="podium-avatar-wrap">
+                <img class="podium-avatar" src="" alt="" />
+              </div>
+              <span class="podium-name"></span>
+              <span class="podium-score"></span>
+              <div class="podium-block">
+                <span class="podium-rank">1</span>
+              </div>
+            </div>
+            <div class="podium-place third" id="podium-3rd">
+              <div class="podium-avatar-wrap">
+                <img class="podium-avatar" src="" alt="" />
+              </div>
+              <span class="podium-name"></span>
+              <span class="podium-score"></span>
+              <div class="podium-block">
+                <span class="podium-rank">3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="results-stats" id="results-stats">
+          <!-- Dynamic stats -->
+        </div>
+        <div class="results-detail" id="results-detail">
+          <!-- Full leaderboard for >3 players -->
+        </div>
+        <div class="streak-update" id="streak-update">
+          <div class="streak-icon">🔥</div>
+          <span id="streak-text">Win Streak: 0</span>
+        </div>
+        <button id="btn-play-again" class="btn btn-primary btn-lg">
+          FORGE AGAIN
+        </button>
+      </div>
+    </section>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <!-- Audio element for previews -->
+  <audio id="audio-player" crossorigin="anonymous"></audio>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

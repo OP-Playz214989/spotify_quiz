@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b2b"/>
+      <stop offset="100%" style="stop-color:#e05520"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="#0a0a0c"/>
+  <path d="M50 15 L55 8 L58 16 L63 12 L63 20 L69 18 L66 26 L73 24 L68 31 L75 32 L69 37 L76 40 L69 43 L75 48 L68 48 L73 54 L66 52 L69 59 L63 56 L63 63 L58 57 L55 63 L50 57 L45 63 L42 57 L37 63 L37 56 L31 59 L34 52 L27 54 L32 48 L25 48 L31 43 L24 40 L31 37 L25 32 L32 31 L27 24 L34 26 L31 18 L37 20 L37 12 L42 16 L45 8 L50 15Z" fill="url(#grad)" opacity="0.8"/>
+  <circle cx="50" cy="38" r="13" fill="none" stroke="url(#grad)" stroke-width="2.5"/>
+  <circle cx="50" cy="38" r="3" fill="#ff6b2b"/>
+  <text x="50" y="82" text-anchor="middle" fill="#ff6b2b" font-family="sans-serif" font-size="10" font-weight="bold" letter-spacing="2">SF</text>
+</svg>
