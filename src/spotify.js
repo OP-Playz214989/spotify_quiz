@@ -388,29 +388,28 @@ export const DEMO_PLAYLISTS = [
 ];
 
 /**
- * Get tracks for a demo playlist
+ * Get tracks for a demo playlist (loads in parallel for lightning speed)
  */
 export async function getDemoTracks(playlistId) {
   const playlist = DEMO_PLAYLISTS.find(p => p.id === playlistId) || DEMO_PLAYLISTS[0];
-  const tracks = [];
 
-  for (let i = 0; i < playlist.songs.length; i++) {
-    const s = playlist.songs[i];
-    const preview = await resolveAudioPreview(s.name, s.artist);
-    if (preview) {
-      tracks.push({
+  const results = await Promise.all(
+    playlist.songs.map(async (s, i) => {
+      const preview = await resolveAudioPreview(s.name, s.artist);
+      if (!preview) return null;
+      return {
         id: `demo-${playlistId}-${i}`,
         name: s.name,
         artist: s.artist,
         album: s.album,
-        albumArt: playlist.images[0].url,
+        albumArt: playlist.images[0]?.url || '',
         previewUrl: preview,
         uri: `spotify:track:demo${i}`
-      });
-    }
-  }
+      };
+    })
+  );
 
-  return tracks;
+  return results.filter(Boolean);
 }
 
 /**

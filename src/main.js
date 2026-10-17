@@ -10,7 +10,7 @@ import { initParticles, showToast, showScreen, confettiBurst, getDefaultAvatar }
 
 // ---- State ----
 let currentUser = null;
-let userPlaylists = [];
+let userPlaylists = [...spotify.DEMO_PLAYLISTS];
 let selectedPlaylist = null;
 let selectedRounds = 10;
 let gameState = null;
@@ -94,13 +94,22 @@ async function onAuthenticated() {
     modeSelection.classList.remove('hidden');
 
     // Load playlists (merge user's Spotify playlists + curated Demo Playlists)
-    const spotifyPlaylists = await spotify.getUserPlaylists();
-    userPlaylists = [...spotifyPlaylists, ...spotify.DEMO_PLAYLISTS];
+    try {
+      const spotifyPlaylists = await spotify.getUserPlaylists();
+      if (spotifyPlaylists && spotifyPlaylists.length > 0) {
+        userPlaylists = [...spotifyPlaylists, ...spotify.DEMO_PLAYLISTS];
+      } else {
+        userPlaylists = [...spotify.DEMO_PLAYLISTS];
+      }
+    } catch {
+      userPlaylists = [...spotify.DEMO_PLAYLISTS];
+    }
 
     showToast(`Welcome, ${currentUser.display_name || 'Player'}!`, 'success');
   } catch (err) {
     console.error('Auth error:', err);
     spotify.logout();
+    userPlaylists = [...spotify.DEMO_PLAYLISTS];
     showToast(`Spotify: ${err.message}. You can also use Quick Demo Play below!`, 'error', 7000);
   }
 }
@@ -250,23 +259,24 @@ function renderPlaylistGrid(containerId) {
   if (!container) return;
   container.innerHTML = '';
 
-  if (userPlaylists.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 2rem;">No playlists found. Make sure you have playlists in your Spotify account.</p>';
-    return;
+  // Ensure playlists exist - fallback to DEMO_PLAYLISTS if empty
+  if (!userPlaylists || userPlaylists.length === 0) {
+    userPlaylists = [...spotify.DEMO_PLAYLISTS];
   }
 
-  userPlaylists.forEach(playlist => {
+  userPlaylists.forEach((playlist, index) => {
     const el = document.createElement('div');
     el.className = 'playlist-item';
     el.dataset.id = playlist.id;
 
     const coverUrl = playlist.images?.[0]?.url || getDefaultAvatar(playlist.name);
+    const trackCount = playlist.tracks?.total ?? playlist.tracks ?? playlist.songs?.length ?? 10;
 
     el.innerHTML = `
       <img class="playlist-cover" src="${coverUrl}" alt="${playlist.name}" onerror="this.src='${getDefaultAvatar(playlist.name)}'" />
       <div class="playlist-info">
         <div class="playlist-name">${playlist.name}</div>
-        <div class="playlist-tracks">${playlist.tracks.total} tracks</div>
+        <div class="playlist-tracks">${trackCount} tracks</div>
       </div>
     `;
 
@@ -283,17 +293,31 @@ function renderPlaylistGrid(containerId) {
     });
 
     container.appendChild(el);
+
+    // Auto-select first playlist so IGNITE button is ready immediately
+    if (index === 0 && !selectedPlaylist) {
+      el.classList.add('selected');
+      selectedPlaylist = playlist;
+      const soloBtn = $('btn-start-solo');
+      const multiBtn = $('btn-start-multi');
+      if (soloBtn) soloBtn.disabled = false;
+      if (multiBtn) multiBtn.disabled = false;
+    }
   });
 }
 
 // ---- Solo Game ----
 async function startSoloGame() {
+  if (!selectedPlaylist && userPlaylists && userPlaylists.length > 0) {
+    selectedPlaylist = userPlaylists[0];
+  }
+
   if (!selectedPlaylist) {
     showToast('Please select a playlist first', 'error');
     return;
   }
 
-  showToast('Loading tracks...', 'info');
+  showToast('Forging quiz tracks...', 'info');
 
   try {
     const tracks = await spotify.getPlaylistTracks(selectedPlaylist.id);
@@ -303,10 +327,18 @@ async function startSoloGame() {
       return;
     }
 
+    if (!currentUser) {
+      currentUser = {
+        id: 'guest-' + Math.floor(1000 + Math.random() * 9000),
+        display_name: 'Solo Pilot',
+        images: []
+      };
+    }
+
     const player = {
       id: currentUser.id,
-      name: currentUser.display_name,
-      avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name)
+      name: currentUser.display_name || 'Solo Pilot',
+      avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name || 'Solo Pilot')
     };
 
     const roundsToPlay = Math.min(selectedRounds, tracks.length);
@@ -332,10 +364,18 @@ async function startSoloGame() {
 function createRoom() {
   const code = game.generateRoomCode();
 
+  if (!currentUser) {
+    currentUser = {
+      id: 'host-' + Math.floor(1000 + Math.random() * 9000),
+      display_name: 'Host Pilot',
+      images: []
+    };
+  }
+
   const hostPlayer = {
     id: currentUser.id,
-    name: currentUser.display_name,
-    avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name)
+    name: currentUser.display_name || 'Host Pilot',
+    avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name || 'Host Pilot')
   };
 
   roomManager.createRoom(code, hostPlayer);
@@ -397,10 +437,18 @@ function joinRoom() {
     return;
   }
 
+  if (!currentUser) {
+    currentUser = {
+      id: 'player-' + Math.floor(1000 + Math.random() * 9000),
+      display_name: 'Challenger',
+      images: []
+    };
+  }
+
   const player = {
     id: currentUser.id,
-    name: currentUser.display_name,
-    avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name)
+    name: currentUser.display_name || 'Challenger',
+    avatar: currentUser.images?.[0]?.url || getDefaultAvatar(currentUser.display_name || 'Challenger')
   };
 
   const result = roomManager.joinRoom(code, player);
@@ -447,6 +495,10 @@ function handleJoinFromLink(code) {
 }
 
 async function startMultiGame() {
+  if (!selectedPlaylist && userPlaylists && userPlaylists.length > 0) {
+    selectedPlaylist = userPlaylists[0];
+  }
+
   if (!selectedPlaylist) {
     showToast('Please select a playlist first', 'error');
     return;
