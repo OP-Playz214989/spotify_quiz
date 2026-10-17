@@ -234,13 +234,10 @@ export function confettiBurst() {
 }
 
 /**
- * Default avatar SVG data URI
+ * Default avatar SVG data URI (properly URL-encoded)
  */
 export function getDefaultAvatar(name = 'U') {
-  const initial = name.charAt(0).toUpperCase();
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-    <rect width="100" height="100" rx="50" fill="%23ff6b2b"/>
-    <text x="50" y="55" text-anchor="middle" dominant-baseline="central" fill="white" font-family="Orbitron,sans-serif" font-size="40" font-weight="700">${initial}</text>
-  </svg>`;
-  return `data:image/svg+xml,${svg}`;
+  const initial = (name || 'U').trim().charAt(0).toUpperCase() || 'U';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#ff6b2b"/><text x="50" y="55" text-anchor="middle" dominant-baseline="central" fill="white" font-family="Orbitron,sans-serif" font-size="44" font-weight="700">${initial}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

@@ -269,16 +269,31 @@ function renderPlaylistGrid(containerId) {
     el.className = 'playlist-item';
     el.dataset.id = playlist.id;
 
-    const coverUrl = playlist.images?.[0]?.url || getDefaultAvatar(playlist.name);
+    const defaultCover = getDefaultAvatar(playlist.name);
+    const coverUrl = playlist.images?.[0]?.url || defaultCover;
     const trackCount = playlist.tracks?.total ?? playlist.tracks ?? playlist.songs?.length ?? 10;
 
-    el.innerHTML = `
-      <img class="playlist-cover" src="${coverUrl}" alt="${playlist.name}" onerror="this.src='${getDefaultAvatar(playlist.name)}'" />
-      <div class="playlist-info">
-        <div class="playlist-name">${playlist.name}</div>
-        <div class="playlist-tracks">${trackCount} tracks</div>
-      </div>
-    `;
+    const img = document.createElement('img');
+    img.className = 'playlist-cover';
+    img.src = coverUrl;
+    img.alt = playlist.name || 'Playlist';
+    img.onerror = () => { img.src = defaultCover; };
+
+    const info = document.createElement('div');
+    info.className = 'playlist-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'playlist-name';
+    nameEl.textContent = playlist.name || 'Untitled Playlist';
+
+    const tracksEl = document.createElement('div');
+    tracksEl.className = 'playlist-tracks';
+    tracksEl.textContent = `${trackCount} tracks`;
+
+    info.appendChild(nameEl);
+    info.appendChild(tracksEl);
+    el.appendChild(img);
+    el.appendChild(info);
 
     el.addEventListener('click', () => {
       container.querySelectorAll('.playlist-item').forEach(p => p.classList.remove('selected'));
@@ -320,11 +335,11 @@ async function startSoloGame() {
   showToast('Forging quiz tracks...', 'info');
 
   try {
-    const tracks = await spotify.getPlaylistTracks(selectedPlaylist.id);
+    let tracks = await spotify.getPlaylistTracks(selectedPlaylist.id);
 
-    if (tracks.length < 4) {
-      showToast('Playlist needs at least 4 tracks with previews', 'error');
-      return;
+    if (!tracks || tracks.length < 4) {
+      showToast('Supplementing with Forge Megahits...', 'info');
+      tracks = await spotify.getDemoTracks('demo-global-hits');
     }
 
     if (!currentUser) {
@@ -356,7 +371,7 @@ async function startSoloGame() {
     playNextRound();
   } catch (err) {
     console.error('Failed to load tracks:', err);
-    showToast('Failed to load playlist tracks', 'error');
+    showToast('Error loading tracks: ' + err.message, 'error');
   }
 }
 

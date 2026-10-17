@@ -415,50 +415,63 @@ export async function getDemoTracks(playlistId) {
 /**
  * Get tracks from a playlist (handles Spotify + Fallback resolution + Demo playlists)
  */
-export async function getPlaylistTracks(playlistId, limit = 50) {
+export async function getPlaylistTracks(playlistId, limit = 20) {
   if (playlistId.startsWith('demo-')) {
     return getDemoTracks(playlistId);
   }
 
-  const tracks = [];
-  let offset = 0;
-  let hasMore = true;
+  try {
+    const data = await apiRequest(`/playlists/${playlistId}/tracks?limit=30`);
+    const rawItems = (data.items || [])
+      .map(item => item?.track)
+      .filter(t => t && t.name);
 
-  while (hasMore && tracks.length < limit) {
-    const data = await apiRequest(
-      `/playlists/${playlistId}/tracks?offset=${offset}&limit=50&fields=items(track(id,name,artists,album(name,images),preview_url,uri)),total`
-    );
-
-    const items = data.items || [];
-    for (const item of items) {
-      if (!item.track || !item.track.name) continue;
-
-      let previewUrl = item.track.preview_url;
-      // If Spotify didn't include preview_url, resolve audio preview automatically
-      if (!previewUrl) {
-        previewUrl = await resolveAudioPreview(item.track.name, item.track.artists?.[0]?.name || '');
-      }
-
-      if (previewUrl) {
-        tracks.push({
-          id: item.track.id,
-          name: item.track.name,
-          artist: item.track.artists.map(a => a.name).join(', '),
-          album: item.track.album?.name || 'Unknown Album',
-          albumArt: item.track.album?.images?.[0]?.url || '',
-          previewUrl: previewUrl,
-          uri: item.track.uri
-        });
-      }
-
-      if (tracks.length >= limit) break;
+    if (rawItems.length === 0) {
+      console.warn('No tracks found in playlist, using demo tracks');
+      return getDemoTracks('demo-global-hits');
     }
 
-    offset += 50;
-    hasMore = items.length === 50 && tracks.length < limit;
-  }
+    // Resolve audio previews in parallel for up to 15 tracks
+    const candidateTracks = rawItems.slice(0, 15);
+    const resolved = await Promise.all(
+      candidateTracks.map(async (t) => {
+        let preview = t.preview_url;
+        const artist = (t.artists || []).map(a => a?.name).filter(Boolean).join(', ') || 'Unknown Artist';
+        const primaryArtist = (t.artists || [])[0]?.name || '';
 
-  return tracks;
+        if (!preview) {
+          preview = await resolveAudioPreview(t.name, primaryArtist);
+        }
+
+        if (!preview) return null;
+
+        return {
+          id: t.id || `track-${Math.random()}`,
+          name: t.name,
+          artist: artist,
+          album: t.album?.name || 'Single',
+          albumArt: t.album?.images?.[0]?.url || '',
+          previewUrl: preview,
+          uri: t.uri || ''
+        };
+      })
+    );
+
+    const validTracks = resolved.filter(Boolean);
+
+    if (validTracks.length >= 4) {
+      return validTracks;
+    }
+
+    // If fewer than 4 tracks have previews, supplement with demo tracks
+    console.warn(`Only ${validTracks.length} tracks had previews. Supplementing with demo tracks.`);
+    const fallbackTracks = await getDemoTracks('demo-global-hits');
+    return [...validTracks, ...fallbackTracks].slice(0, limit);
+  } catch (err) {
+    console.error('Error fetching playlist tracks from Spotify:', err);
+    // Graceful fallback to demo tracks so game never fails
+    return getDemoTracks('demo-global-hits');
+  }
 }
 
 /**
