@@ -316,17 +316,89 @@ export async function getUserPlaylists(limit = 50) {
 }
 
 /**
- * Resolve 30-second audio preview via iTunes Search API as fallback
+ * Resolve 30-second audio preview via iTunes Search API with multi-strategy fallback
+ * Ensures the preview actually belongs to the track and artist.
  */
 async function resolveAudioPreview(trackName, artistName) {
   try {
-    const cleanTitle = trackName.replace(/\(.*?\)|\[.*?\]/g, '').trim();
-    const query = encodeURIComponent(`${cleanTitle} ${artistName}`);
-    const res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=song&limit=1`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.results?.[0]?.previewUrl || null;
-  } catch {
+    // Clean track name: remove (feat. ...), (with ...), (from ...), [Remastered], etc.
+    const cleanTitle = trackName
+      .replace(/\s*[\(\[](feat|ft|with|from|version|remaster|prod|live|deluxe|soundtrack)[\.\s\S]*?[\)\]]/gi, '')
+      .replace(/\(.*?\)|\[.*?\]/g, '')
+      .replace(/["'’]/g, '')
+      .trim();
+
+    const artists = (artistName || '')
+      .split(/[,&]/)
+      .map(a => a.trim())
+      .filter(Boolean);
+
+    const primaryArtist = artists[0] || '';
+
+    // Strategy 1: clean title + primary artist
+    if (cleanTitle && primaryArtist) {
+      const q = encodeURIComponent(`${cleanTitle} ${primaryArtist}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          const match = data.results?.find(r => r.previewUrl);
+          if (match?.previewUrl) return match.previewUrl;
+        } catch {}
+      }
+    }
+
+    // Strategy 2: clean title + secondary artist (if any)
+    if (cleanTitle && artists.length > 1) {
+      const q = encodeURIComponent(`${cleanTitle} ${artists[1]}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          const match = data.results?.find(r => r.previewUrl);
+          if (match?.previewUrl) return match.previewUrl;
+        } catch {}
+      }
+    }
+
+    // Strategy 3: raw track title + primary artist (in case cleaning stripped a keyword)
+    if (primaryArtist) {
+      const q = encodeURIComponent(`${trackName.replace(/["']/g, '')} ${primaryArtist}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          const match = data.results?.find(r => r.previewUrl);
+          if (match?.previewUrl) return match.previewUrl;
+        } catch {}
+      }
+    }
+
+    // Strategy 4: clean title alone, BUT verify artist overlap to avoid playing a completely wrong song
+    if (cleanTitle) {
+      const q = encodeURIComponent(cleanTitle);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          const lowerArtists = artists.map(a => a.toLowerCase());
+          const match = data.results?.find(r => {
+            if (!r.previewUrl) return false;
+            const resArtist = (r.artistName || '').toLowerCase();
+            return lowerArtists.some(a => resArtist.includes(a) || a.includes(resArtist));
+          });
+          if (match?.previewUrl) return match.previewUrl;
+        } catch {}
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Error resolving preview for:', trackName, err);
     return null;
   }
 }
@@ -413,40 +485,48 @@ export async function getDemoTracks(playlistId) {
 }
 
 /**
- * Get tracks from a playlist (handles Spotify + Fallback resolution + Demo playlists)
+ * Get tracks from a playlist (exclusively returns tracks from the selected Spotify playlist)
  */
 export async function getPlaylistTracks(playlistId, limit = 20) {
   if (playlistId.startsWith('demo-')) {
     return getDemoTracks(playlistId);
   }
 
-  try {
-    const data = await apiRequest(`/playlists/${playlistId}/tracks?limit=30`);
-    const rawItems = (data.items || [])
-      .map(item => item?.track)
-      .filter(t => t && t.name);
+  // Fetch playlist tracks from Spotify (fetch up to 100 tracks)
+  const data = await apiRequest(`/playlists/${playlistId}/tracks?limit=100`);
+  const rawItems = (data.items || [])
+    .map(item => item?.track)
+    .filter(t => t && t.id && t.name && !t.is_local && (t.type === 'track' || !t.type));
 
-    if (rawItems.length === 0) {
-      console.warn('No tracks found in playlist, using demo tracks');
-      return getDemoTracks('demo-global-hits');
-    }
+  if (rawItems.length === 0) {
+    throw new Error('This playlist is empty or contains no playable tracks.');
+  }
 
-    // Resolve audio previews in parallel for up to 15 tracks
-    const candidateTracks = rawItems.slice(0, 15);
-    const resolved = await Promise.all(
-      candidateTracks.map(async (t) => {
+  console.log(`[SOUNDFORGE] Found ${rawItems.length} songs in Spotify playlist. Resolving audio previews...`);
+
+  // Resolve audio previews in batches of 6 with short delay
+  const validTracks = [];
+  const batchSize = 6;
+  const targetTracks = Math.max(limit, 12);
+
+  for (let i = 0; i < rawItems.length; i += batchSize) {
+    const batch = rawItems.slice(i, i + batchSize);
+    const resolvedBatch = await Promise.all(
+      batch.map(async (t) => {
         let preview = t.preview_url;
         const artist = (t.artists || []).map(a => a?.name).filter(Boolean).join(', ') || 'Unknown Artist';
-        const primaryArtist = (t.artists || [])[0]?.name || '';
 
         if (!preview) {
-          preview = await resolveAudioPreview(t.name, primaryArtist);
+          preview = await resolveAudioPreview(t.name, artist);
         }
 
-        if (!preview) return null;
+        if (!preview) {
+          console.warn(`[SOUNDFORGE] Could not resolve preview for "${t.name}" by ${artist}`);
+          return null;
+        }
 
         return {
-          id: t.id || `track-${Math.random()}`,
+          id: t.id || `spotify-${Math.random()}`,
           name: t.name,
           artist: artist,
           album: t.album?.name || 'Single',
@@ -457,21 +537,25 @@ export async function getPlaylistTracks(playlistId, limit = 20) {
       })
     );
 
-    const validTracks = resolved.filter(Boolean);
+    validTracks.push(...resolvedBatch.filter(Boolean));
 
-    if (validTracks.length >= 4) {
-      return validTracks;
+    // If we have collected enough songs from the playlist for the game, stop resolving
+    if (validTracks.length >= targetTracks) {
+      break;
     }
 
-    // If fewer than 4 tracks have previews, supplement with demo tracks
-    console.warn(`Only ${validTracks.length} tracks had previews. Supplementing with demo tracks.`);
-    const fallbackTracks = await getDemoTracks('demo-global-hits');
-    return [...validTracks, ...fallbackTracks].slice(0, limit);
-  } catch (err) {
-    console.error('Error fetching playlist tracks from Spotify:', err);
-    // Graceful fallback to demo tracks so game never fails
-    return getDemoTracks('demo-global-hits');
+    // Gentle micro-delay between batches to respect rate limits
+    if (i + batchSize < rawItems.length) {
+      await new Promise(r => setTimeout(r, 30));
+    }
   }
+
+  if (validTracks.length < 4) {
+    throw new Error(`Only ${validTracks.length} of ${rawItems.length} songs in this playlist have playable audio previews. At least 4 tracks are needed for a quiz.`);
+  }
+
+  console.log(`[SOUNDFORGE] Successfully prepared ${validTracks.length} tracks exclusively from this Spotify playlist!`);
+  return validTracks;
 }
 
 /**

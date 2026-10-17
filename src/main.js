@@ -98,11 +98,15 @@ async function onAuthenticated() {
       const spotifyPlaylists = await spotify.getUserPlaylists();
       if (spotifyPlaylists && spotifyPlaylists.length > 0) {
         userPlaylists = [...spotifyPlaylists, ...spotify.DEMO_PLAYLISTS];
+        // Automatically default to the user's first Spotify playlist!
+        selectedPlaylist = spotifyPlaylists[0];
       } else {
         userPlaylists = [...spotify.DEMO_PLAYLISTS];
+        selectedPlaylist = spotify.DEMO_PLAYLISTS[0];
       }
     } catch {
       userPlaylists = [...spotify.DEMO_PLAYLISTS];
+      selectedPlaylist = spotify.DEMO_PLAYLISTS[0];
     }
 
     showToast(`Welcome, ${currentUser.display_name || 'Player'}!`, 'success');
@@ -110,6 +114,7 @@ async function onAuthenticated() {
     console.error('Auth error:', err);
     spotify.logout();
     userPlaylists = [...spotify.DEMO_PLAYLISTS];
+    selectedPlaylist = spotify.DEMO_PLAYLISTS[0];
     showToast(`Spotify: ${err.message}. You can also use Quick Demo Play below!`, 'error', 7000);
   }
 }
@@ -121,6 +126,9 @@ function startDemoMode() {
     display_name: 'Guest Player',
     images: [{ url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120' }]
   };
+
+  userPlaylists = [...spotify.DEMO_PLAYLISTS];
+  selectedPlaylist = spotify.DEMO_PLAYLISTS[0];
 
   const avatar = $('user-avatar');
   const nameEl = $('user-name');
@@ -264,10 +272,24 @@ function renderPlaylistGrid(containerId) {
     userPlaylists = [...spotify.DEMO_PLAYLISTS];
   }
 
-  userPlaylists.forEach((playlist, index) => {
+  // Ensure selectedPlaylist is set to a valid playlist in userPlaylists
+  if (!selectedPlaylist || !userPlaylists.some(p => p.id === selectedPlaylist.id)) {
+    selectedPlaylist = userPlaylists[0];
+  }
+
+  userPlaylists.forEach((playlist) => {
     const el = document.createElement('div');
     el.className = 'playlist-item';
     el.dataset.id = playlist.id;
+
+    // Check if this playlist is currently selected
+    if (selectedPlaylist && selectedPlaylist.id === playlist.id) {
+      el.classList.add('selected');
+      const soloBtn = $('btn-start-solo');
+      const multiBtn = $('btn-start-multi');
+      if (soloBtn) soloBtn.disabled = false;
+      if (multiBtn) multiBtn.disabled = false;
+    }
 
     const defaultCover = getDefaultAvatar(playlist.name);
     const coverUrl = playlist.images?.[0]?.url || defaultCover;
@@ -299,6 +321,7 @@ function renderPlaylistGrid(containerId) {
       container.querySelectorAll('.playlist-item').forEach(p => p.classList.remove('selected'));
       el.classList.add('selected');
       selectedPlaylist = playlist;
+      console.log(`[SOUNDFORGE] User selected playlist: "${playlist.name}" (${playlist.id})`);
 
       // Enable start button
       const soloBtn = $('btn-start-solo');
@@ -308,16 +331,6 @@ function renderPlaylistGrid(containerId) {
     });
 
     container.appendChild(el);
-
-    // Auto-select first playlist so IGNITE button is ready immediately
-    if (index === 0 && !selectedPlaylist) {
-      el.classList.add('selected');
-      selectedPlaylist = playlist;
-      const soloBtn = $('btn-start-solo');
-      const multiBtn = $('btn-start-multi');
-      if (soloBtn) soloBtn.disabled = false;
-      if (multiBtn) multiBtn.disabled = false;
-    }
   });
 }
 
@@ -332,14 +345,14 @@ async function startSoloGame() {
     return;
   }
 
-  showToast('Forging quiz tracks...', 'info');
+  showToast(`Forging quiz from "${selectedPlaylist.name}"...`, 'info', 4000);
 
   try {
-    let tracks = await spotify.getPlaylistTracks(selectedPlaylist.id);
+    const tracks = await spotify.getPlaylistTracks(selectedPlaylist.id, selectedRounds);
 
     if (!tracks || tracks.length < 4) {
-      showToast('Supplementing with Forge Megahits...', 'info');
-      tracks = await spotify.getDemoTracks('demo-global-hits');
+      showToast(`Could not find enough tracks with previews in "${selectedPlaylist.name}". Need at least 4.`, 'error', 6000);
+      return;
     }
 
     if (!currentUser) {
@@ -366,12 +379,20 @@ async function startSoloGame() {
     });
 
     gameState.isActive = true;
+
+    // Display playlist name badge in quiz header
+    const playlistBadge = $('quiz-playlist-name');
+    if (playlistBadge) {
+      playlistBadge.textContent = selectedPlaylist.name;
+      playlistBadge.title = `Playlist: ${selectedPlaylist.name}`;
+    }
+
     showScreen('screen-quiz');
     renderScoreboard();
     playNextRound();
   } catch (err) {
     console.error('Failed to load tracks:', err);
-    showToast('Error loading tracks: ' + err.message, 'error');
+    showToast(`Could not load "${selectedPlaylist.name}": ${err.message}`, 'error', 6000);
   }
 }
 
@@ -482,6 +503,14 @@ function joinRoom() {
       players: data.players
     });
     gameState.isActive = true;
+
+    // Display playlist name badge in quiz header
+    const playlistBadge = $('quiz-playlist-name');
+    if (playlistBadge && data.playlistName) {
+      playlistBadge.textContent = data.playlistName;
+      playlistBadge.title = `Playlist: ${data.playlistName}`;
+    }
+
     showScreen('screen-quiz');
     renderScoreboard();
     playNextRound();
@@ -519,13 +548,13 @@ async function startMultiGame() {
     return;
   }
 
-  showToast('Loading tracks...', 'info');
+  showToast(`Forging multiplayer arena from "${selectedPlaylist.name}"...`, 'info', 4000);
 
   try {
-    const tracks = await spotify.getPlaylistTracks(selectedPlaylist.id);
+    const tracks = await spotify.getPlaylistTracks(selectedPlaylist.id, selectedRounds);
 
-    if (tracks.length < 4) {
-      showToast('Playlist needs at least 4 tracks with previews', 'error');
+    if (!tracks || tracks.length < 4) {
+      showToast(`Could not find enough tracks with previews in "${selectedPlaylist.name}". Need at least 4.`, 'error', 6000);
       return;
     }
 
@@ -541,6 +570,14 @@ async function startMultiGame() {
     });
 
     gameState.isActive = true;
+    gameState.playlistName = selectedPlaylist.name;
+
+    // Display playlist name badge in quiz header
+    const playlistBadge = $('quiz-playlist-name');
+    if (playlistBadge) {
+      playlistBadge.textContent = selectedPlaylist.name;
+      playlistBadge.title = `Playlist: ${selectedPlaylist.name}`;
+    }
 
     // Broadcast game start to other players
     roomManager.broadcastGameStart(gameState);
@@ -550,7 +587,7 @@ async function startMultiGame() {
     playNextRound();
   } catch (err) {
     console.error('Failed to start multiplayer game:', err);
-    showToast('Failed to load playlist tracks', 'error');
+    showToast(`Could not load "${selectedPlaylist.name}": ${err.message}`, 'error', 6000);
   }
 }
 

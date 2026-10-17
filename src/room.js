@@ -148,7 +148,8 @@ class RoomManager {
       type: 'game_start',
       totalRounds: gameState.totalRounds,
       tracks: gameState.tracks,
-      players: gameState.players
+      players: gameState.players,
+      playlistName: gameState.playlistName
     });
   }
 

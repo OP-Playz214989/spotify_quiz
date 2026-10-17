@@ -812,6 +812,33 @@ body::after {
   color: var(--text-secondary);
 }
 
+.quiz-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.quiz-playlist-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 0, 85, 0.12);
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .round-indicator span {
   color: var(--accent-primary);
 }
